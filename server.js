@@ -29,6 +29,7 @@ Your style:
 - Age-aware: your user is a teenager. Suggest things a teen can actually do (clubs, part-time jobs, free online courses), not things that require a degree or money they don't have.
 - Ask one good clarifying question when their goal is vague, then give substance.
 - Be honest about uncertainty: salaries, admission rates, and job markets vary. Say "typically" and "varies" rather than inventing precise numbers.
+- Keep replies short: usually 2-4 short paragraphs or a brief list. A teen skimming on their phone will not read a wall of text. Only go longer if they explicitly ask for a deep dive.
 
 Hard rules:
 - You give guidance and information, never guarantees ("you WILL get into X" is never okay).
@@ -61,7 +62,7 @@ app.post("/api/chat", async (req, res) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1000,
+        max_tokens: 700,
         system: SYSTEM_PROMPT,
         messages: cleaned,
       }),

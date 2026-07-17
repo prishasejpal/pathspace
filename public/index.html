@@ -498,16 +498,7 @@
     setLoading(true);
 
     try {
-      // Relative path — works locally AND deployed on Render
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: history.slice(-16)
-        })
-      });
-
-      const data = await res.json();
+      const data = await fetchChatWithRetry({ messages: history.slice(-16) });
       setTyping(false);
       setLoading(false);
 
@@ -524,6 +515,37 @@
       setTyping(false);
       setLoading(false);
       addMsg('bot', 'Connection error. Please check your internet and try again.');
+    }
+  }
+
+  // The free hosting tier puts the server to sleep after inactivity, so the
+  // first request after a while can time out while it wakes up. Retry once
+  // after a short wait instead of failing immediately.
+  async function fetchChatWithRetry(payload, attempt = 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      // Relative path — works locally AND deployed on Render
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error('http_error');
+      return await res.json();
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (attempt < 2) {
+        addMsg('bot', "Still connecting — the server may be waking up from sleep. This can take up to a minute the first time. Hang tight...", '');
+        await new Promise((r) => setTimeout(r, 4000));
+        return fetchChatWithRetry(payload, attempt + 1);
+      }
+      throw err;
     }
   }
 
