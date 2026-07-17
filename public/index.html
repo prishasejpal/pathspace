@@ -127,6 +127,9 @@
       color: #111;
       border: 0.5px solid #e5e7eb;
       border-radius: 4px 16px 16px 16px;
+      font-size: 13px;
+      padding: 7px 11px;
+      line-height: 1.5;
     }
     .msg.user .bubble {
       background: #E5E9FA;
@@ -154,6 +157,40 @@
       0%,60%,100% { transform: translateY(0); }
       30% { transform: translateY(-5px); }
     }
+
+    .attach-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 16px;
+      background: #fff;
+      border-top: 0.5px solid #e5e7eb;
+    }
+    .attach-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 12px;
+      border: 0.5px dashed #d1d5db;
+      transition: all 0.12s;
+    }
+    .attach-btn:hover { border-color: #8B9BE8; color: #2A3B8F; background: #E5E9FA; }
+    .attach-btn i { font-size: 13px; }
+    .attach-optional { color: #9CA3AF; }
+    .attached-chip {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px;
+      color: #2A3B8F;
+      background: #E5E9FA;
+      border-radius: 12px;
+      padding: 4px 8px 4px 10px;
+    }
+    .attached-chip i { font-size: 13px; }
+    .attach-remove {
+      border: none; background: transparent; cursor: pointer;
+      font-size: 15px; line-height: 1; color: #6b7280; padding: 0 2px;
+    }
+    .attach-remove:hover { color: #B91C1C; }
 
     .input-area {
       display: flex; gap: 8px;
@@ -234,14 +271,14 @@
   </div>
 
   <div class="checkin">
-    <div class="checkin-label">Quick check-in — what's on your mind?</div>
+    <div class="checkin-label">What are you working on?</div>
     <div class="mood-row">
-      <button class="mood-btn" onclick="pickFocus(this,'careers','The user is exploring what careers might fit them.')">Careers</button>
-      <button class="mood-btn" onclick="pickFocus(this,'college','The user is thinking about college and admissions.')">College</button>
-      <button class="mood-btn" onclick="pickFocus(this,'other paths','The user is curious about trade school, certifications, or paths besides college.')">Other paths</button>
-      <button class="mood-btn" onclick="pickFocus(this,'classes','The user is deciding what classes to take.')">Classes</button>
-      <button class="mood-btn" onclick="pickFocus(this,'jobs','The user wants a first job or internship.')">Jobs &amp; internships</button>
-      <button class="mood-btn" onclick="pickFocus(this,'lost','The user feels lost about their future and needs a starting point.')">Feeling lost</button>
+      <button class="mood-btn" onclick="pickFocus(this,'finding a job','The user wants to find a job or internship.')">Find a job</button>
+      <button class="mood-btn" onclick="pickFocus(this,'a college plan','The user is thinking about college and admissions.')">College plan</button>
+      <button class="mood-btn" onclick="pickFocus(this,'a career plan','The user is exploring what careers might fit them and how to plan toward one.')">Career plan</button>
+      <button class="mood-btn" onclick="pickFocus(this,'trade school or other paths','The user is curious about trade school, certifications, or paths besides college.')">Trade / other paths</button>
+      <button class="mood-btn" onclick="pickFocus(this,'choosing classes','The user is deciding what classes to take.')">Classes</button>
+      <button class="mood-btn" onclick="pickFocus(this,'feeling lost about the future','The user feels lost about their future and needs a starting point.')">Feeling lost</button>
     </div>
   </div>
 
@@ -268,6 +305,18 @@
         <div class="dot"></div>
         <div class="dot"></div>
       </div>
+    </div>
+  </div>
+
+  <div class="attach-row">
+    <label class="attach-btn" for="file-input" title="Attach your resume, transcript, or notes (optional)">
+      <i class="ti ti-paperclip"></i> Attach resume / transcript <span class="attach-optional">(optional)</span>
+    </label>
+    <input type="file" id="file-input" accept=".txt,.md,.pdf" style="display:none" onchange="handleFile(event)" />
+    <div class="attached-chip" id="attached-chip" style="display:none;">
+      <i class="ti ti-file-text"></i>
+      <span id="attached-name"></span>
+      <button class="attach-remove" onclick="clearAttachment()" aria-label="Remove attachment">&times;</button>
     </div>
   </div>
 
@@ -302,6 +351,12 @@
 </div><!-- end .app -->
 
 
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+</script>
 <script>
   // Crisis keyword detection — same protocol as MindSpace
   const CRISIS_KEYWORDS = [
@@ -319,6 +374,56 @@
   let history = [];
   let focusContext = '';
   let isLoading = false;
+  let attachedText = '';
+  let attachedName = '';
+  const MAX_ATTACH_CHARS = 6000;
+  const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > MAX_ATTACH_BYTES) {
+      alert('That file is too large — please attach something under 5MB.');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        attachedText = await extractPdfText(file);
+      } else {
+        attachedText = await file.text();
+      }
+      attachedName = file.name;
+      document.getElementById('attached-name').textContent = file.name;
+      document.getElementById('attached-chip').style.display = 'flex';
+    } catch (err) {
+      alert('Could not read that file. Try a .txt, .md, or .pdf instead.');
+      e.target.value = '';
+    }
+  }
+
+  async function extractPdfText(file) {
+    if (!window.pdfjsLib) throw new Error('PDF reader unavailable');
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    const pageCount = Math.min(pdf.numPages, 12);
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    return text;
+  }
+
+  function clearAttachment() {
+    attachedText = '';
+    attachedName = '';
+    document.getElementById('file-input').value = '';
+    document.getElementById('attached-chip').style.display = 'none';
+  }
 
   function pickFocus(btn, focus, context) {
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
@@ -332,7 +437,7 @@
     return CRISIS_KEYWORDS.some(w => t.includes(w));
   }
 
-  function addMsg(role, text) {
+  function addMsg(role, displayText, historyText) {
     const box = document.getElementById('chat-box');
     const wrap = document.createElement('div');
     wrap.className = `msg ${role}`;
@@ -345,7 +450,7 @@
 
     const bub = document.createElement('div');
     bub.className = 'bubble';
-    bub.textContent = text;
+    bub.textContent = displayText;
 
     if (role === 'user') { wrap.appendChild(bub); wrap.appendChild(av); }
     else { wrap.appendChild(av); wrap.appendChild(bub); }
@@ -353,7 +458,7 @@
     box.appendChild(wrap);
     box.scrollTop = box.scrollHeight;
 
-    history.push({ role: role === 'bot' ? 'assistant' : 'user', content: text });
+    history.push({ role: role === 'bot' ? 'assistant' : 'user', content: historyText !== undefined ? historyText : displayText });
   }
 
   function setTyping(on) {
@@ -375,7 +480,15 @@
 
     input.value = '';
     resize(input);
-    addMsg('user', text);
+
+    let outgoing = text;
+    if (attachedText) {
+      const trimmed = attachedText.slice(0, MAX_ATTACH_CHARS);
+      outgoing = `[The user attached a file named "${attachedName}". Use it as background context if relevant, but don't quote it back verbatim unless asked.]\n---\n${trimmed}\n---\n\n${text}`;
+      clearAttachment();
+    }
+
+    addMsg('user', text, outgoing);
 
     if (isCrisis(text)) {
       document.getElementById('crisis-banner').classList.add('show');

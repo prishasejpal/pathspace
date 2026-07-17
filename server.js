@@ -49,7 +49,7 @@ app.post("/api/chat", async (req, res) => {
       .slice(-20)
       .map((m) => ({
         role: m.role === "assistant" ? "assistant" : "user",
-        content: String(m.content || "").slice(0, 4000),
+        content: String(m.content || "").slice(0, 9000),
       }));
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
